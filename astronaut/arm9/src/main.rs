@@ -208,6 +208,7 @@ pub fn filetype(extension: &str) -> FileType {
         (".NDS", FileType::Rom),
         (".DSI", FileType::Rom),
         (".APP", FileType::Rom),
+        (".SRL", FileType::Rom),
     ];
     ASSOCIATION_LIST
         .iter()
