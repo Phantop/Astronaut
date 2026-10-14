@@ -67,7 +67,7 @@ fn save_settings(config: &Config) -> Settings {
 }
 fn override_string(
     ui: &mut micro_imgui_ds::micro_imgui::Ui<'_, '_, micro_imgui_ds::DSMicroGuiBackend>,
-    data: &mut super::GlobalData,
+    path: &mut String,
     label: &str,
     format: &'static [FileType],
     transform: &'static dyn Fn(&mut GlobalData, String) -> Option<Box<dyn UiPage>>,
@@ -77,9 +77,9 @@ fn override_string(
     ui.label(label);
     ui.horizontal(|ui| {
         if ui.button("reset").clicked() {
-            transform(data, String::new());
+            path.clear();
         }
-        if path_button(ui, &data.config.music, 28).clicked() {
+        if path_button(ui, path, 28).clicked() {
             result = Browser::search_file(
                 format,
                 String::from("sdmc:/"),
@@ -99,20 +99,21 @@ impl Settings {
     ) -> Option<Box<dyn UiPage>> {
         let a = &|data: &mut GlobalData, path: String| -> Option<Box<dyn UiPage>> {
             data.config.music = path;
-            Some(Box::new(Settings::Main))
+            Some(Box::new(Self::Overrides))
         };
         let b = &|data: &mut GlobalData, path: String| -> Option<Box<dyn UiPage>> {
             data.config.top_wallpaper = path;
-            Some(Box::new(Self::Main))
+            Some(Box::new(Self::Overrides))
         };
 
         let c = &|data: &mut GlobalData, path: String| -> Option<Box<dyn UiPage>> {
             data.config.ext_blowfish_main = path;
-            Some(Box::new(Self::Main))
+            Some(Box::new(Self::Overrides))
         };
-        let result = override_string(ui, data, "Override Music:", &[FileType::Wav, FileType::Mod], a)
-            .or(override_string(ui, data, "Override Wallpaper", &[FileType::Bmp], b))
-            .or(override_string(ui, data, "Override Blowfish key", &[FileType::Bin], c));
+        let result = override_string(ui, &mut data.config.music, "Override Music:", &[FileType::Wav, FileType::Mod], a)
+            .or(override_string(ui, &mut data.config.top_wallpaper, "Override Wallpaper", &[FileType::Bmp], b))
+            .or(override_string(ui, &mut data.config.ext_blowfish_main, "Override Blowfish key", &[FileType::Bin], c))
+            .or(ui.input_pressed(Input(Buttons::BUTTON_B)).then_some(Box::new(Self::Main)));
         super::goto_end(ui);
         result.or(ui.button("Go Back").clicked().then_some(Box::new(Self::Main)))
     }
@@ -173,6 +174,10 @@ impl Settings {
             if ui.button("Change Boot Combos").clicked() {
                 *self = Self::BootCombos(0);
             }   
+        }
+
+        if ui.input_pressed(Input(Buttons::BUTTON_B)) {
+            result = Some(Box::new(MainMenu));
         }
 
         super::goto_end(ui);
@@ -252,6 +257,9 @@ impl Settings {
             if ui.input_pressed(Input(Buttons::BUTTON_L)) {
                 *self = Self::BootCombos(page - 1)
             }
+        }
+        if ui.input_pressed(Input(Buttons::BUTTON_B)) {
+            *self = Self::Main
         }
         ui.horizontal(|ui| {
             if ui.button("go back").clicked() {
