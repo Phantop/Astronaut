@@ -113,7 +113,7 @@ impl DecodedBMP {
     pub fn from_reader(mut reader: fatfs_embedded::fatfs::File) -> Option<DecodedBMP> {
         let header = BMPHeader::from_reader(&mut reader)?;
         let dib = DIBHeader40Bytes::from_reader(&mut reader)?;
-        if dib.resolution_x != 256 || dib.resolution_y != 192 {
+        if dib.width > 256 || dib.height > 192 {
             return None;
         }
         let palette_len = if dib.compression != 3 {
