@@ -23,7 +23,7 @@ mod special_thanks;
 mod settings;
 
 fn goto_end(ui: &mut micro_imgui_ds::micro_imgui::Ui<'_, '_, micro_imgui_ds::DSMicroGuiBackend>) {
-    ui.add_space(ui.clip_rect().height() - 14);
+    ui.add_space(ui.clip_rect().height() - 24);
 }
 
 pub unsafe fn load_gui(app_data: &mut AppData, fader: &mut Fader, buttons: Buttons) {

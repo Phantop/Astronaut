@@ -181,6 +181,7 @@ impl Settings {
         }
 
         super::goto_end(ui);
+        ui.label("Unsaved settings will be lost on reboot!");
         ui.horizontal(|ui| {
             if ui.button("exit").clicked() {
                 result = Some(Box::new(MainMenu));
