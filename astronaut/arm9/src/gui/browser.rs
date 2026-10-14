@@ -369,6 +369,11 @@ impl Browser {
             Err(_abort) => (),
         }
     }
+    #[link_section = ".text_aux"]
+    fn handle_bmp(&self, file_name: &str, data: &mut GlobalData) {
+        let mut path = self.current_path.clone() + file_name;
+        unsafe { data.load_wall(&mut path) };
+    }
     /// Decide to do with a file thats been picked in the [`BrowserMode::Browsing`] mode.
     fn standard_goal(&self, file: &FileEntry, data: &mut GlobalData) -> Option<Box<dyn UiPage>> {
         let FileEntry {
@@ -389,6 +394,12 @@ impl Browser {
             FileType::Wav => {
                 if !data.safe_mode {
                     self.handle_wav(file_name, data);
+                }
+                None
+            }
+            FileType::Bmp => {
+                if !data.safe_mode {
+                    self.handle_bmp(file_name, data);
                 }
                 None
             }
@@ -469,10 +480,10 @@ impl UiPage for Browser {
         // Show all the items
         for (i, item) in shown_items.iter().take(max_items).enumerate() {
             let color = match item.kind {
-                FileType::None | FileType::Bin | FileType::Ini | FileType::Bmp => ui.style().text_color,
                 FileType::Rom => data.theme.bootable_color,
-                FileType::Mod | FileType::Wav => data.theme.asset_color,
+                FileType::Mod | FileType::Wav | FileType::Bmp => data.theme.asset_color,
                 FileType::Dir => data.theme.folder_color,
+                _ => ui.style().text_color,
             };
             let response = ui.add(Button::new(
                 &item.display_name,
