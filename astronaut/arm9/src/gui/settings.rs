@@ -114,7 +114,7 @@ impl Settings {
             .or(override_string(ui, &mut data.config.top_wallpaper, "Override Wallpaper", &[FileType::Bmp], b))
             .or(override_string(ui, &mut data.config.ext_blowfish_main, "Override Blowfish key", &[FileType::Bin], c))
             .or(ui.input_pressed(Input(Buttons::BUTTON_B)).then_some(Box::new(Self::Main)));
-        super::goto_end(ui);
+        super::goto_end(ui, 14);
         result.or(ui.button("Go Back").clicked().then_some(Box::new(Self::Main)))
     }
     fn main_settings(
@@ -180,7 +180,7 @@ impl Settings {
             result = Some(Box::new(MainMenu));
         }
 
-        super::goto_end(ui);
+        super::goto_end(ui, 22);
         ui.label("Unsaved settings will be lost on reboot!");
         ui.horizontal(|ui| {
             if ui.button("exit").clicked() {
@@ -242,9 +242,7 @@ impl Settings {
                 }
             })
         }
-        super::goto_end(ui);
-
-        ui.add_space(2);
+        super::goto_end(ui, 14);
 
         if let Some(del) = delete {
             data.config.boot_combos.additionals.remove(del);

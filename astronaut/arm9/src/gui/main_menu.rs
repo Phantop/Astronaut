@@ -44,7 +44,7 @@ fn main_menu_ui(
     if ui.input_pressed(gui::Input(Buttons::BUTTON_START)) {
         res = Some(Box::new(SpecialThanks));
     }
-    super::goto_end(ui);
+    super::goto_end(ui, 14);
     ui.label(concat!(
         concat!("version ", env!("CARGO_PKG_VERSION")),
         env!("GIT_HASH")
