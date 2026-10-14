@@ -29,12 +29,23 @@ pub struct DIBHeader40Bytes {
     pub important_colors: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DecodedBMP {
     pub header: BMPHeader,
     pub dib: DIBHeader40Bytes,
     pub colors: Vec<u8>,
     pub bitmap: Vec<u8>,
+}
+impl Clone for DecodedBMP {
+    #[link_section = ".text_aux"]
+    fn clone(&self) -> Self {
+        Self {
+            header: self.header.clone(),
+            dib: self.dib.clone(),
+            colors: self.colors.clone(),
+            bitmap: self.bitmap.clone(),
+        }
+    }
 }
 impl DecodedBMP {
     pub fn bitmap(&self) -> &[u8] {

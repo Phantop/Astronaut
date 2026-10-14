@@ -107,7 +107,11 @@ impl AppData {
     }
     pub fn update(&mut self, f: &mut micro_imgui::Frame<'_, super::DSMicroGuiBackend>) {
         let _mouse = f.last_known_pointer_location();
+        let animated_background = self.global_data.update_wallpaper_animation();
         f.central_panel(|ui| {
+            if animated_background {
+                ui.request_repaint();
+            }
             {
                 let color = ui.style().background_color;
                 ui.paint_shape(micro_imgui::Shape::Rectangle {

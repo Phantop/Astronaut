@@ -10,6 +10,13 @@ This section contains filepaths which can either be absolute, or relative to the
 * ``music``: The sound file to play for the theme
 * ``font``: A custom font for the theme, which can be generated with the font converter tool in `tools/font_converter`
 
+## animation
+
+This section contains settings for animating the top screen wallpaper.
+
+* ``rate``: Number of display updates each frame stays visible (defaults to 8)
+* ``frame_0``, ``frame_1``, ...: Each image to display on the top screen
+
 ## colors
 
 This section contains basic colors

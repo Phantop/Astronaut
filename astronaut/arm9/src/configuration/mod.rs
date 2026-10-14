@@ -126,14 +126,80 @@ pub struct Theme {
     pub folder_color: Color,
     pub bootable_color: Color,
     pub asset_color: Color,
+    pub(crate) animation: Animation,
+}
+pub(crate) struct Animation {
+    pub(crate) enabled: bool,
+    frames: Vec<String>,
+    cache: Vec<(String, crate::bmp::DecodedBMP)>,
+    rate: u64,
+    index: usize,
+    ticks: u64,
+}
+impl Animation {
+    const DEFAULT: Self = Animation {
+        enabled: false,
+        frames: Vec::new(),
+        cache: Vec::new(),
+        rate: 8,
+        index: 0,
+        ticks: 0,
+    };
 }
 impl Theme {
     pub const DEFAULT: Self = Theme {
         folder_color: Color::new(200, 100, 100),
         bootable_color: Color::new(100, 200, 100),
         asset_color: Color::new(100, 100, 200),
+        animation: Animation::DEFAULT,
     };
+    #[link_section = ".text_aux"]
+    #[inline(never)]
+    fn handle_ini_entry(
+        &mut self,
+        base_dir: &String,
+        assets: &mut Assets,
+        style: &mut Style,
+        segment: &str,
+        key: &str,
+        value: &str,
+    ) {
+        match (segment, key) {
+            ("[assets]", "music") => handle_path(base_dir, &mut assets.music, value),
+            ("[assets]", "wallpaper") => handle_path(base_dir, &mut assets.wallpaper, value),
+            ("[assets]", "background") => handle_path(base_dir, &mut assets.background, value),
+            ("[assets]", "font") => handle_path(base_dir, &mut assets.font, value),
+            ("[animation]", "rate") => {
+                if let Ok(rate) = value.parse::<u64>() {
+                    self.animation.rate = rate;
+                }
+            }
+            ("[animation]", key) if key.starts_with("frame_") => {
+                if key
+                    .strip_prefix("frame_")
+                    .and_then(|index| index.parse::<usize>().ok())
+                    .is_some()
+                {
+                    let mut frame = String::new();
+                    handle_path(base_dir, &mut frame, value);
+                    if !frame.is_empty() {
+                        self.animation.frames.push(frame);
+                    }
+                }
+            }
+            ("[colors]", "background") => parse_color(value, &mut style.background_color),
+            ("[colors]", "text") => parse_color(value, &mut style.text_color),
+            ("[colors]", "assets") => parse_color(value, &mut self.asset_color),
+            ("[colors]", "roms") => parse_color(value, &mut self.bootable_color),
+            ("[colors]", "folders") => parse_color(value, &mut self.folder_color),
+            ("[widgets]", key) => handlecolorset(&mut style.default, key, value),
+            ("[widgets.active]", key) => handlecolorset(&mut style.focused, key, value),
+            ("[widgets.pressed]", key) => handlecolorset(&mut style.pressed, key, value),
+            _ => (),
+        }
+    }
     pub fn load(&mut self, theme_path: &mut String) -> (Assets, Style) {
+        self.animation = Animation::DEFAULT;
         let mut assets = Assets {
             music: String::new(),
             wallpaper: String::new(),
@@ -146,24 +212,9 @@ impl Theme {
         };
         let mut base_dir = theme_path.clone();
         pop_dir_entry(&mut base_dir);
-        ini::Ini::new(
-            &theme_string,
-            Some(&mut |segment, key, value| match (segment, key) {
-                ("[assets]", "music") => handle_path(&base_dir, &mut assets.music, value),
-                ("[assets]", "wallpaper") => handle_path(&base_dir, &mut assets.wallpaper, value),
-                ("[assets]", "background") => handle_path(&base_dir, &mut assets.background, value),
-                ("[assets]", "font") => handle_path(&base_dir, &mut assets.font, value),
-                ("[colors]", "background") => parse_color(value, &mut style.background_color),
-                ("[colors]", "text") => parse_color(value, &mut style.text_color),
-                ("[colors]", "assets") => parse_color(value, &mut self.asset_color),
-                ("[colors]", "roms") => parse_color(value, &mut self.bootable_color),
-                ("[colors]", "folders") => parse_color(value, &mut self.folder_color),
-                ("[widgets]", key) => handlecolorset(&mut style.default, key, value),
-                ("[widgets.active]", key) => handlecolorset(&mut style.focused, key, value),
-                ("[widgets.pressed]", key) => handlecolorset(&mut style.pressed, key, value),
-                _ => (),
-            }),
-        );
+        ini::Ini::new(&theme_string, Some(&mut |segment, key, value| {
+            self.handle_ini_entry(&base_dir, &mut assets, &mut style, segment, key, value)
+        }));
         (assets, style)
     }
 }
@@ -300,7 +351,8 @@ impl GlobalData {
             crate::load_default_font()
         }
     }
-    pub unsafe fn load_wall<'a, 'b: 'a>(&'b mut self, mut path: &'a mut String) {
+    #[link_section = ".text_aux"]
+    pub(crate) unsafe fn load_wall<'a, 'b: 'a>(&'b mut self, path: &'a mut String) {
         fn abort_loading() {
             unsafe {
                 VIDEO_HARDWARE
@@ -311,20 +363,26 @@ impl GlobalData {
         if self.safe_mode {
             return abort_loading();
         }
-        if !self.config.top_wallpaper.is_empty() {
-            path = &mut self.config.top_wallpaper;
-        }
+        let animated = self.theme.animation.enabled;
         {
-            if let Some(wallpaper) = Self::load_wallpaper(path) {
-                VIDEO_HARDWARE
-                    .vram_control_bank_c
-                    .write(VRAMCtrl::ENABLE | VRAMCtrl::LCD_MAPPED);
-
-                crate::gui::show_wallpaper(wallpaper, 0x06840000 as *mut u16);
-
+            let wallpaper = if animated {
+                if let Some((_, wallpaper)) = self.theme.animation.cache.iter().find(|(frame, _)| frame == path.as_str()) {
+                    Some(wallpaper.clone())
+                } else if let Some(wallpaper) = Self::load_wallpaper(path) {
+                    self.theme.animation.cache.push((path.clone(), wallpaper.clone()));
+                    Some(wallpaper)
+                } else {
+                    None
+                }
+            } else {
+                Self::load_wallpaper(path)
+            };
+            if let Some(wallpaper) = wallpaper {
                 VIDEO_HARDWARE
                     .vram_control_bank_c
                     .write(VRAMCtrl::ENABLE | VRAMCtrl::MST_4);
+
+                crate::gui::show_wallpaper(wallpaper, 0x06200000 as *mut u16);
                 VIDEO_HARDWARE
                     .disp_b_control
                     .write(DisplayControl::BG_MODE_5 | DisplayControl::ENABLE_BG_3);
@@ -366,6 +424,19 @@ impl GlobalData {
             mut background,
             mut font,
         } = assets;
+        let has_wallpaper_override = !self.config.top_wallpaper.is_empty();
+        self.theme.animation.enabled = !has_wallpaper_override
+            && !self.theme.animation.frames.is_empty();
+        if self.theme.animation.enabled {
+            self.theme.animation.cache.reserve(self.theme.animation.frames.len());
+        }
+        if has_wallpaper_override {
+            wallpaper = self.config.top_wallpaper.clone();
+        } else if self.theme.animation.enabled {
+            if let Some(frame) = self.theme.animation.frames.first() {
+                wallpaper = frame.clone();
+            }
+        }
         // Video stuff
         self.load_font(&mut font);
         self.load_wall(&mut wallpaper);
@@ -375,6 +446,28 @@ impl GlobalData {
         // Audio stuff
         self.load_music(&mut music);
         video_context
+    }
+
+    #[link_section = ".text_aux"]
+    pub fn update_wallpaper_animation(&mut self) -> bool {
+        if self.safe_mode || !self.theme.animation.enabled {
+            return false;
+        }
+        let frame_count = self.theme.animation.frames.len();
+        if frame_count <= 1 {
+            return false;
+        }
+
+        self.theme.animation.ticks = self.theme.animation.ticks.saturating_add(1);
+        if self.theme.animation.ticks >= self.theme.animation.rate {
+            self.theme.animation.ticks = 0;
+            self.theme.animation.index = (self.theme.animation.index + 1) % frame_count;
+            let mut path = self.theme.animation.frames[self.theme.animation.index].clone();
+            unsafe {
+                self.load_wall(&mut path);
+            }
+        }
+        true
     }
 }
 fn load_font(path: &mut String) -> Option<Vec<u8>> {
