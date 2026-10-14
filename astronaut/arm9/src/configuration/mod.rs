@@ -300,7 +300,7 @@ impl GlobalData {
             crate::load_default_font()
         }
     }
-    unsafe fn load_wall<'a, 'b: 'a>(&'b mut self, mut path: &'a mut String) {
+    pub unsafe fn load_wall<'a, 'b: 'a>(&'b mut self, mut path: &'a mut String) {
         fn abort_loading() {
             unsafe {
                 VIDEO_HARDWARE
