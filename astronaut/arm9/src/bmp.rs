@@ -113,6 +113,9 @@ impl DecodedBMP {
     pub fn from_reader(mut reader: fatfs_embedded::fatfs::File) -> Option<DecodedBMP> {
         let header = BMPHeader::from_reader(&mut reader)?;
         let dib = DIBHeader40Bytes::from_reader(&mut reader)?;
+        if dib.resolution_x != 256 || dib.resolution_y != 192 {
+            return None;
+        }
         let palette_len = if dib.compression != 3 {
             dib.color_count.min(1 << dib.bits_per_pixel as u32) as usize
         } else {
@@ -126,6 +129,10 @@ impl DecodedBMP {
             return None;
         }
         let bitmap_size = dib.bitmap_size as usize;
+        // Overly generous, but using 1MB to allow for odd but somehow valid BMPs.
+        if bitmap_size > (1 << 20) {
+            return None;
+        }
         let mut bitmap = alloc::vec![0u8; bitmap_size];
         if read_all(&mut bitmap[..], &mut reader).is_err() {
             return None;
